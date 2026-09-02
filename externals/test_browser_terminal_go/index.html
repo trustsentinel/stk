@@ -1,0 +1,43 @@
+<html>
+  <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css"></link>
+    <style>
+      #terminal {
+      background: #000000;
+      color: #ffffff;
+      display: inline-block;
+      padding: 10px;
+      width: 800px;
+    height: 450px;
+      }
+    </style>
+  </head>
+  <body>
+
+    <pre id="terminal"></pre>
+
+    <script>
+      var elem = document.getElementById("terminal");
+      elem.tabindex = 0; // make the terminal focusable
+      var terminal = new Terminal();
+      terminal.open(elem);
+      terminal.focus();
+      var socket = new WebSocket('ws://'+document.location.host+'/ws', 'echo');
+      socket.onopen = function(e) {
+        
+      };
+      terminal.on('key', (key, ev) => {
+        console.log(key.charCodeAt(0));
+        if (key.charCodeAt(0) == 13) {
+          socket.send('\n')
+        }
+        socket.send(key)
+      });
+
+      socket.onmessage = function(e) {
+        terminal.write(e.data)
+      };
+    </script>
+  </body>
+</html>

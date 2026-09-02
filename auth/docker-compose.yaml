@@ -1,0 +1,11 @@
+version: "2"
+
+services:
+  auth:
+    image: golang:1.6.1-alpine
+    volumes:
+      - .:/go/src/stk.auth
+    working_dir: /go/src/stk.auth
+    command: go run server.go
+  redis:
+    image: redis:alpine

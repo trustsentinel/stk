@@ -1,0 +1,48 @@
+{
+  "name": "stk.web",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "frontend": "webpack --watch --mode development --env=dev",
+    "prod:frontend": "webpack --watch --mode development --env=prod",
+    "build:backend": "tsc",
+    "build:frontend": "webpack --mode development --env=dev",
+    "prod:build:frontend": "webpack --mode development --env=prod",
+    "copy:assets": "cpx 'src/web/assets/**' 'dist/web/frontend'",
+    "start": "node ./dist/main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "@vrankode Alvaro Lopez",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/express": "^4.17.1",
+    "@types/node": "^12.7.3",
+    "@types/react": "^16.9.2",
+    "@types/react-dom": "^16.9.0",
+    "@types/react-router-dom": "^4.3.5",
+    "clean-webpack-plugin": "^3.0.0",
+    "css-loader": "^3.2.0",
+    "react-router-dom": "^5.0.1",
+    "source-map-loader": "^0.2.4",
+    "style-loader": "^1.0.0",
+    "ts-loader": "^6.0.4",
+    "typescript": "^3.6.2",
+    "webpack": "^4.39.3",
+    "webpack-cli": "^3.3.7"
+  },
+  "dependencies": {
+    "cpx": "^1.5.0",
+    "ejs": "^2.7.1",
+    "express": "^4.17.1",
+    "file-loader": "^4.2.0",
+    "react": "^16.9.0",
+    "react-confirm-alert": "^2.4.1",
+    "react-dom": "^16.9.0",
+    "react-private-route": "^1.1.2",
+    "tweetnacl": "^1.0.1",
+    "tweetnacl-util": "^0.15.0",
+    "xterm": "4.0",
+    "xterm-addon-fit": "^0.2.1"
+  }
+}

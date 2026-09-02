@@ -1,0 +1,26 @@
+syntax = "proto2";
+package requests;
+
+message Request {
+    optional int32 id = 1 [default=0];
+}
+
+message Auth {
+    optional int32  id = 1 [default=1];
+    required int32  sid = 2;
+    required string publicKey = 3;
+}
+
+message AuthAck {
+    optional int32 id = 1 [default=2];
+    required int32 sid = 2;
+    required string publicKey = 3;
+    optional string address = 4;
+    optional int32 port = 5;
+}
+
+message Hearbeat {
+    optional int32 id = 1 [default=3];
+    required string token = 2;
+    required int64 timestamp = 3;
+}
