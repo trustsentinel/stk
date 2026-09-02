@@ -5,7 +5,12 @@
 
 `stk` is a secure lightweight broker for remote shell access.
 
-[![Build Status](https://travis-ci.org/vrandkode/stk.svg?branch=develop)](https://travis-ci.org/vrandkode/stk)
+> **Provenance.** This repository is the TrustSentinel continuation of the original
+> prototype at [`bluebycode/stk`](https://github.com/bluebycode/stk) (2019, by
+> [@bluebycode](https://github.com/bluebycode) / vrandkode). It was imported clean-start
+> (no upstream history) and sanitized. See [ORIGIN.md](ORIGIN.md) for details. Not to be
+> confused with [`trustsentinel/stuk`](https://github.com/trustsentinel/stuk), the
+> port-knocking SSH access manager — a separate project.
 
 
 Designed for any browser.
