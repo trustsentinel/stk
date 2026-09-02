@@ -1,50 +1,20 @@
-<p align="center">
-  <img src="docs/images/stk-logo.png" width="200"/>
-</p>
+# stk
 
+Secure lightweight broker for browser-based remote shell access.
 
-`stk` is a secure lightweight broker for remote shell access.
+`Status: Active` · `Go · TypeScript` · `Noise Protocol` · part of [TrustSentinel](https://trustsentinel.eu)
 
-> **Provenance.** This repository is the TrustSentinel continuation of the original
-> prototype at [`bluebycode/stk`](https://github.com/bluebycode/stk) (2019, by
-> [@bluebycode](https://github.com/bluebycode) / vrandkode). It was imported clean-start
-> (no upstream history) and sanitized. See [ORIGIN.md](ORIGIN.md) for details. Not to be
-> confused with [`trustsentinel/stuk`](https://github.com/trustsentinel/stuk), the
-> port-knocking SSH access manager — a separate project.
+## Overview
+stk puts a shell in the browser without exposing SSH to the network. A Go
+agent/hub brokers end-to-end encrypted sessions over the Noise Protocol, with an
+xterm.js terminal front end and TOTP/U2F authentication.
 
+## Layout
+- `agent/`, `auth/` — Go backend (hub, peers, Noise transport, protobuf)
+- `auth/web/` — TypeScript/React terminal UI
+- `reference/marshmallows-agent/` — sibling Noise agent kept for reference
 
-Designed for any browser.
+## License
+MIT
 
-<p align="center">
-  <img src="docs/images/stk_demo1.png" width="650"/>
-</p>
-
-**Agent**: ```./agent -environment production --token mymachine```
-
-### Please install last 
-
-**Usage**
----
-
-```
-go get 
-```
-
-**Installation Options**
----
-
-1. Install with [`golang`]
-    + `$ go get .`
-
-2. Deploy from docker repository.
-
-
-
-
-**Acknowledgements**
----
-
-### Colaborators
-
-* Álvaro López (@vrandkode)
-* Guillermo Mora (@guillermijas)
+<sub>Originally prototyped at bluebycode/stk (2019); continued under TrustSentinel.</sub>
