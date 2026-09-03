@@ -65,7 +65,7 @@ func newPipelineHub(incoming chan []byte, outgoing chan []byte, cincoming chan [
 var channels = make(map[string]chan bool, 1000)
 
 /// createDedicatedChannel allow new upcoming messages into the specific pipeline
-/// created by a new ws client-server connection under a randomly port (@todo not arbitrary?¿)
+/// created by a new ws client-server connection under a randomly port (@todo not arbitrary?)
 func createDedicatedChannel(channelID string, port int, c chan bool,
 	incoming *chan []byte, outgoing *chan []byte,
 	cin *chan []byte, cout *chan []byte) {
