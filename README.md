@@ -34,7 +34,21 @@ an **xterm.js** terminal front end and TOTP/U2F authentication.
 - `agent/` — host-side agent (Noise transport, shell, key handling)
 - `auth/` — hub/broker + auth (peers, channels, protobuf); `auth/web/` is the TS/React terminal UI
 - `common/` — shared protocol/helpers
+- `crypto/` — key handling + secure randomness, extracted as a tested Go module
+- `deploy/` — container test scenarios (see below)
 - `reference/marshmallows-agent/` — sibling Noise agent kept for reference
+
+## Testing
+The tested core builds and runs in a container today:
+
+```bash
+docker compose -f deploy/test/compose.yml run --rm crypto-test
+```
+
+The full **browser → hub → agent** end-to-end scenario is described in
+[`deploy/e2e.blueprint.yml`](deploy/e2e.blueprint.yml); it is a gated blueprint
+until the transport port lands (`gopkg.in/noisesocket.v0` no longer resolves as a
+module — see [`docs/PORTING.md`](docs/PORTING.md)). Details: [`deploy/README.md`](deploy/README.md).
 
 ## Status & roadmap
 Working prototype (2019), being modernized under TrustSentinel:

@@ -1,0 +1,16 @@
+# stk — containerized crypto tests (RUNS TODAY)
+#
+#   docker compose -f deploy/test/compose.yml run --rm crypto-test
+#
+# Builds the stk crypto module and runs its unit tests inside a container.
+# Green = the tested core of stk (key handling + secure randomness, incl. the
+# key-truncation regression test) is intact, independent of the host toolchain.
+#
+# For the full end-to-end scenario (browser -> hub -> agent), see
+# ../e2e.blueprint.yml — that one is a target, not yet runnable.
+services:
+  crypto-test:
+    build:
+      context: ../..            # repo root, so the Dockerfile can COPY crypto/
+      dockerfile: deploy/test/Dockerfile
+    image: stk-crypto-test:local

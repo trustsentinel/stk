@@ -1,0 +1,82 @@
+# stk — end-to-end test scenario  (BLUEPRINT — NOT RUNNABLE YET)
+# ==============================================================================
+# This is the target topology for testing the full stk flow, mirroring the
+# architecture in the README:
+#
+#     ┌──────────┐   Noise    ┌────────────┐   Noise    ┌──────────────┐
+#     │ web      │ ─────────> │  hub       │ <───────── │  agent       │
+#     │ xterm.js │   (WS)     │  (broker)  │   (WS)     │  shell + keys│
+#     └──────────┘            └────────────┘            └──────────────┘
+#         browser side          brokers the           the host being
+#                               encrypted session     shelled into
+#
+# WHY IT DOES NOT RUN TODAY
+# -------------------------
+# The Go services below (hub, agent) do NOT compile: stk is a 2019 GOPATH-era
+# prototype that depends on `gopkg.in/noisesocket.v0`, which is no longer a
+# resolvable Go module. See ../docs/PORTING.md. Until that transport is ported
+# (to flynn/noise) and a root go.mod exists, `docker build` on these services
+# will fail. To keep this file safe to have in-tree, every app service is gated
+# behind the `e2e` compose profile, so a plain `docker compose up` starts
+# NOTHING. Do not remove the profile until the build blockers are cleared.
+#
+# DEFINITION OF DONE (what turns this blueprint into a real ./compose/ demo,
+# the way stuk's deploy/compose already works):
+#   1. Root go.mod; relative "./protocol" imports rewritten to module paths.
+#   2. noisesocket.v0 replaced with a flynn/noise transport in agent + auth.
+#   3. Dockerfiles below build the hub and agent binaries.
+#   4. test-e2e.sh: start hub+agent, drive a scripted command through the web
+#      endpoint, assert the command's output returns over the brokered channel,
+#      then assert the session tears down and no plain SSH port was ever opened.
+# ==============================================================================
+
+services:
+  # --- broker -----------------------------------------------------------------
+  hub:
+    profiles: ["e2e"]           # inert until the port lands (see header)
+    build:
+      context: ..
+      dockerfile: deploy/hub.Dockerfile          # TODO: create when auth/ builds
+    environment:
+      STK_LISTEN: ":8443"
+    # No host port published on purpose: the whole point is "no open shell port".
+    # The web frontend reaches the hub over the internal compose network.
+
+  # --- host being brokered ----------------------------------------------------
+  agent:
+    profiles: ["e2e"]
+    build:
+      context: ..
+      dockerfile: deploy/agent.Dockerfile        # TODO: create when agent/ builds
+    environment:
+      STK_HUB: "hub:8443"
+      STK_SHELL: "/bin/sh"      # the shell the agent brokers
+    depends_on:
+      - hub
+    # The agent dials OUT to the hub; it exposes no inbound port.
+
+  # --- browser side (xterm.js) ------------------------------------------------
+  web:
+    profiles: ["e2e"]
+    build:
+      context: ../auth/web      # existing TS/webpack frontend
+    environment:
+      STK_HUB_WS: "ws://hub:8443"
+    ports:
+      - "8080:80"               # the ONLY published port: the browser UI
+    depends_on:
+      - hub
+
+  # --- test driver ------------------------------------------------------------
+  # Asserts: session opens through the hub, a scripted command round-trips over
+  # the brokered channel, then the session closes — and no direct shell port
+  # was ever exposed by hub or agent.
+  e2e:
+    profiles: ["e2e"]
+    image: alpine:3.20
+    depends_on:
+      - web
+      - agent
+    volumes:
+      - ./test-e2e.sh:/test-e2e.sh:ro            # TODO: author alongside the port
+    command: ["sh", "/test-e2e.sh"]
