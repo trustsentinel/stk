@@ -1,0 +1,64 @@
+# stk — end-to-end test scenario (RUNS: docker compose ... or ./test-e2e.sh)
+#
+#     client ──WS──> hub (broker) <──WS── agent (PTY shell)
+#            \___________ end-to-end Noise (XX) ___________/
+#
+# The client and agent run a mutually-authenticated Noise session; the hub only
+# relays ciphertext (it holds no keys). The agent dials OUT to the hub and listens
+# on nothing — there is no shell port to attack. Keys are generated at startup by
+# the `keygen` one-shot (not hardcoded).
+
+x-stk-build: &stk-build
+  context: ../..
+  dockerfile: deploy/compose/Dockerfile
+
+services:
+  # One-shot: provision agent + client Noise identities into a shared volume.
+  keygen:
+    build: *stk-build
+    command: ["sh", "-c", "stk-keygen -dir /keys agent client && ls -l /keys"]
+    volumes:
+      - keys:/keys
+
+  # Broker. The only component that listens for inbound connections.
+  hub:
+    build: *stk-build
+    command: ["stk-hub", "-addr", ":8443"]
+    # ports: ["8443:8443"]   # uncomment to point a browser/manual client at it
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8443/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  # The host being shelled into. Dials out to the hub; exposes no inbound port.
+  agent:
+    build: *stk-build
+    depends_on:
+      keygen: {condition: service_completed_successfully}
+      hub: {condition: service_healthy}
+    volumes:
+      - keys:/keys:ro
+    # $$ escapes compose interpolation so the shell expands $(...) at runtime.
+    command:
+      - sh
+      - -c
+      - >
+        stk-agent -hub ws://hub:8443/ws -room demo
+        -key "$$(cat /keys/agent.key)" -pubkey "$$(cat /keys/agent.pub)"
+        -authorized-client "$$(cat /keys/client.pub)"
+
+  # Test driver: runs the assertions, exits 0 on PASS.
+  e2e:
+    build: *stk-build
+    depends_on:
+      keygen: {condition: service_completed_successfully}
+      hub: {condition: service_healthy}
+      agent: {condition: service_started}
+    volumes:
+      - keys:/keys:ro
+      - ./test-e2e.sh:/test-e2e.sh:ro
+    command: ["sh", "/test-e2e.sh"]
+
+volumes:
+  keys:
