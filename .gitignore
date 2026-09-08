@@ -1,3 +1,10 @@
-a
+# build artifacts
+web/stk.wasm
+/stk-hub
+/stk-agent
+/stk-client
+/stk-keygen
+
+# node (legacy front end lives under _legacy/)
 node_modules
 yarn.lock

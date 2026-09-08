@@ -22,6 +22,13 @@ A runnable module now lives at the repo root (`module github.com/trustsentinel/s
 - Unit tests for the handshake (incl. **unauthorized-peer rejection**) and
   transport; a runnable Compose e2e in [`deploy/compose/`](../deploy/compose/):
   *blocked → brokered → encrypted → executed; no open shell port.*
+- **`cmd/stk-wasm` + `web/`** — the **browser client**: the same `secure`/`transport`
+  Go code compiled to WebAssembly (`GOOS=js GOARCH=wasm`) over a browser-WebSocket
+  `MsgConn`, driving an xterm.js terminal. One audited Noise implementation, shared
+  by the CLI and the browser — no JS reimplementation. Verified in a real browser
+  (handshake → PTY shell → command execution → multiple sessions).
+- **CI** — `.github/workflows/ci.yml`: build+test (`-race`), gofmt, wasm build,
+  crypto-module tests, `govulncheck`/`gosec`, and the Compose e2e.
 - **`crypto/`** — the stdlib-only crypto/random helpers as a separate tested
   module. Fixes a real bug: the original `DecodeKey` copied only 4 of 32 key bytes.
 
@@ -34,12 +41,11 @@ A runnable module now lives at the repo root (`module github.com/trustsentinel/s
 | `externals/` experimental tree | left in `_legacy/`, excluded from the build |
 | proto2 generated code | not needed by the MVP; a proto3/connect-go schema is future work if wire-compat with the 2019 protocol is wanted |
 
-## Not yet ported (from `_legacy/`)
-1. **Browser / xterm.js front end** (`_legacy/auth/web`) — rebuild as a `stk-client`
-   equivalent in the browser (WebSocket + a WASM/JS Noise XX implementation).
-2. **Per-device identity & enrollment** — the MVP uses generated static keys; add
+## Not yet ported / next
+1. **Per-device identity & enrollment** — the MVP uses generated static keys; add
    provisioning/attestation and per-user secrets.
-3. **Earlier initiator auth** — XX authenticates the client on message 3 (the agent
+2. **Earlier initiator auth** — XX authenticates the client on message 3 (the agent
    rejects an unknown client, but only as the session drops). IK/KK refuse up front.
-4. **CI + hardening** — GitHub Actions (`go test`, `govulncheck`, `gosec`), and the
-   Kubernetes manifests sketched in `deploy/README.md`.
+3. **Kubernetes manifests** — sketched in `deploy/README.md`.
+4. **Richer browser UX** (from `_legacy/auth/web`) — window resize/SIGWINCH,
+   reconnect, session list, TOTP/WebAuthn login.

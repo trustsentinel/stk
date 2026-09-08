@@ -36,9 +36,14 @@ func (s *Session) Read(b []byte) (int, error) { return s.f.Read(b) }
 // Write writes terminal input.
 func (s *Session) Write(b []byte) (int, error) { return s.f.Write(b) }
 
-// Close closes the PTY (the shell receives SIGHUP) and reaps the process.
+// Close closes the PTY and reaps the shell. It kills the process explicitly:
+// closing the PTY master does not reliably terminate the shell on every platform,
+// and without this the agent could hang in Wait() and never serve again.
 func (s *Session) Close() error {
 	_ = s.f.Close()
+	if s.cmd.Process != nil {
+		_ = s.cmd.Process.Kill()
+	}
 	_ = s.cmd.Wait()
 	return nil
 }

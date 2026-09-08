@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stk — browser client</title>
+<link rel="stylesheet" href="vendor/xterm.min.css">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 13px/1.5 -apple-system, system-ui, sans-serif; }
+  header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: #161b22; border-bottom: 1px solid #30363d; }
+  header .title { font-weight: 700; letter-spacing: .04em; color: #e6edf3; margin-right: 8px; }
+  header input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 5px 8px; font: inherit; }
+  header input#agent { width: 340px; }
+  header button { background: #238636; border: 0; color: #fff; border-radius: 6px; padding: 6px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  header button:disabled { background: #30363d; color: #8b949e; cursor: default; }
+  #status { margin-left: auto; color: #8b949e; font-variant-numeric: tabular-nums; }
+  #status.ok { color: #3fb950; }
+  #status.err { color: #f85149; }
+  #terminal { padding: 8px; height: calc(100vh - 52px); }
+  .hint { padding: 4px 14px 10px; color: #8b949e; background: #161b22; }
+  code { color: #d2a8ff; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title">stk</span>
+    <label>room <input id="room" value="demo" size="8"></label>
+    <label>agent key <input id="agent" placeholder="base64 agent public key (optional)"></label>
+    <button id="connect" disabled>Loading…</button>
+    <span id="status">initializing</span>
+  </header>
+  <div class="hint">Browser client running the same Go Noise&nbsp;XX code as the CLI, compiled to WebAssembly. Keystrokes are end-to-end encrypted to the agent; the hub only relays ciphertext.</div>
+  <div id="terminal"></div>
+
+  <script src="vendor/xterm.min.js"></script>
+  <script src="wasm_exec.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

@@ -89,6 +89,7 @@ func copyMsgs(dst, src *websocket.Conn, done chan struct{}) {
 
 func main() {
 	addr := flag.String("addr", ":8443", "listen address")
+	webdir := flag.String("webdir", "", "if set, serve the browser client (static files) from this directory at /")
 	flag.Parse()
 
 	b := &broker{waiting: map[string]*websocket.Conn{}}
@@ -98,6 +99,10 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	if *webdir != "" {
+		mux.Handle("/", http.FileServer(http.Dir(*webdir)))
+		log.Printf("serving browser client from %s at /", *webdir)
+	}
 	log.Printf("stk-hub listening on %s", *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }

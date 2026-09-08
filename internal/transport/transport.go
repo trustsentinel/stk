@@ -2,16 +2,13 @@
 //
 // stk relays whole messages (Noise handshake messages, then encrypted transport
 // frames) rather than a raw byte stream, so the unit everything is built on is a
-// MsgConn: send one []byte, receive one []byte. A WebSocket (one binary frame per
-// message) and an in-memory Pipe (for tests) both implement it, which lets the
-// secure session and the hub relay be tested without a network.
+// MsgConn: send one []byte, receive one []byte. A server/CLI WebSocket
+// (transport_ws.go), a browser WebSocket (transport_js.go), and an in-memory Pipe
+// all implement it, which lets the secure session run unchanged on every platform
+// — including GOOS=js/wasm in the browser — and be tested without a network.
 package transport
 
-import (
-	"sync"
-
-	"github.com/gorilla/websocket"
-)
+import "sync"
 
 // MsgConn is a bidirectional, message-oriented connection: each WriteMsg is
 // delivered to the peer as exactly one ReadMsg.
@@ -20,31 +17,6 @@ type MsgConn interface {
 	ReadMsg() ([]byte, error)
 	Close() error
 }
-
-// WSConn adapts a gorilla *websocket.Conn to MsgConn using binary frames.
-type WSConn struct {
-	c  *websocket.Conn
-	mu sync.Mutex // gorilla allows one concurrent writer; serialize writes
-}
-
-// NewWSConn wraps a websocket connection.
-func NewWSConn(c *websocket.Conn) *WSConn { return &WSConn{c: c} }
-
-// WriteMsg sends p as a single binary websocket frame.
-func (w *WSConn) WriteMsg(p []byte) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.c.WriteMessage(websocket.BinaryMessage, p)
-}
-
-// ReadMsg returns the payload of the next websocket data frame.
-func (w *WSConn) ReadMsg() ([]byte, error) {
-	_, p, err := w.c.ReadMessage()
-	return p, err
-}
-
-// Close closes the underlying websocket.
-func (w *WSConn) Close() error { return w.c.Close() }
 
 // pipeConn is one end of an in-memory MsgConn pair.
 type pipeConn struct {
