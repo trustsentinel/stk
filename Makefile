@@ -15,7 +15,10 @@ vet:
 fmt:
 	gofmt -w cmd internal
 
-web:              ## build the browser client into web/stk.wasm
+web:              ## build the browser client (stk.wasm + matching wasm_exec.js)
+	@GOROOT="$$(go env GOROOT)"; \
+	if [ -f "$$GOROOT/lib/wasm/wasm_exec.js" ]; then cp "$$GOROOT/lib/wasm/wasm_exec.js" web/wasm_exec.js; \
+	elif [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then cp "$$GOROOT/misc/wasm/wasm_exec.js" web/wasm_exec.js; fi
 	GOOS=js GOARCH=wasm go build -o web/stk.wasm ./cmd/stk-wasm
 
 e2e:              ## run the containerized end-to-end test

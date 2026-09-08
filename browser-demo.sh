@@ -13,6 +13,10 @@ trap cleanup EXIT INT TERM
 go build -o "$BIN/hub" ./cmd/stk-hub
 go build -o "$BIN/agent" ./cmd/stk-agent
 go build -o "$BIN/keygen" ./cmd/stk-keygen
+# build the browser client + copy the matching wasm runtime shim
+GOROOT="$(go env GOROOT)"
+if [ -f "$GOROOT/lib/wasm/wasm_exec.js" ]; then cp "$GOROOT/lib/wasm/wasm_exec.js" web/wasm_exec.js
+elif [ -f "$GOROOT/misc/wasm/wasm_exec.js" ]; then cp "$GOROOT/misc/wasm/wasm_exec.js" web/wasm_exec.js; fi
 GOOS=js GOARCH=wasm go build -o web/stk.wasm ./cmd/stk-wasm
 
 "$BIN/keygen" -dir "$KEYS" agent >/dev/null 2>&1
