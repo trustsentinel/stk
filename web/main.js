@@ -4,7 +4,7 @@
 
   var term = new Terminal({ cursorBlink: true, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, theme: { background: "#0d1117" } });
   term.open(document.getElementById("terminal"));
-  term.writeln("stk browser client — set the agent key (optional) and press Connect.");
+  term.writeln("stk browser client — set the agent key (required) and press Connect.");
 
   var statusEl = document.getElementById("status");
   var connectBtn = document.getElementById("connect");

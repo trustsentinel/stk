@@ -35,7 +35,7 @@ browser front end is kept under [`_legacy/`](_legacy/) for reference.
 │ client       │ ─────────> │  stk hub   │ <───────── │  agent (host)│
 │ CLI / browser│   (WS)     │  (broker)  │   (WS)     │  PTY shell   │
 └──────────────┘            └────────────┘            └──────────────┘
-   end-to-end encrypted (XX, mutual auth) — hub relays ciphertext, no open shell port
+   end-to-end encrypted (Noise IK, mutual auth) — hub relays ciphertext, no open shell port
 ```
 
 ## Quick start
@@ -74,12 +74,22 @@ locally and asserts a command round-trips through the encrypted broker.
 - `deploy/` — container scenarios: `compose/` (full e2e) and `test/` (crypto tests)
 - `_legacy/` — the original 2019 GOPATH prototype + browser front end, kept for reference (not built)
 
+## Identity & enrollment
+- Each device has a persistent identity: `-identity <file>` loads it, creating one
+  (mode 0600) on first use. Its public key is what peers pin/authorize.
+- The client **pins** the agent it will talk to: `-authorized-agent <agent-pubkey>`
+  (required — this is what defeats a malicious hub / MITM).
+- The agent **authorizes** clients: `-authorized-clients <file>` is an
+  SSH-`authorized_keys`-style registry (one base64 key per line, `#` comments),
+  re-read each session so enrolling a client needs no restart. `-authorized-client
+  <key>` sets a single key inline. Empty ⇒ accept any authenticated client (dev).
+
 ## Status & roadmap
-Working Go MVP (hub + agent + CLI **and** browser clients) with mutual-auth Noise,
-unit tests, a runnable Compose e2e, and GitHub Actions CI. Next:
-- **per-device identity** + enrollment (attestation) instead of generated demo keys
-- earlier initiator auth (**IK/KK**) so unauthorized clients are refused up front
-- Kubernetes manifests (see [`deploy/README.md`](deploy/README.md))
+Working Go MVP (hub + agent + CLI **and** browser clients), Noise **IK** mutual auth
+(unauthorized clients refused on the first message), persistent device identities +
+an enrollment registry, unit tests, a runnable Compose e2e, and GitHub Actions CI.
+Next: Kubernetes manifests (see [`deploy/README.md`](deploy/README.md)); hardware
+attestation to bind identities to a TPM/secure element.
 
 ## License
 MIT

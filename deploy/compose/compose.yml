@@ -13,10 +13,14 @@ x-stk-build: &stk-build
   dockerfile: deploy/compose/Dockerfile
 
 services:
-  # One-shot: provision agent + client Noise identities into a shared volume.
+  # One-shot: provision agent + client Noise identities and enroll the client by
+  # writing its key into an authorized-clients registry the agent reads.
   keygen:
     build: *stk-build
-    command: ["sh", "-c", "stk-keygen -dir /keys agent client && ls -l /keys"]
+    command:
+      - sh
+      - -c
+      - stk-keygen -dir /keys agent client && cp /keys/client.pub /keys/authorized_clients && ls -l /keys
     volumes:
       - keys:/keys
 
@@ -46,7 +50,7 @@ services:
       - >
         stk-agent -hub ws://hub:8443/ws -room demo
         -key "$$(cat /keys/agent.key)" -pubkey "$$(cat /keys/agent.pub)"
-        -authorized-client "$$(cat /keys/client.pub)"
+        -authorized-clients /keys/authorized_clients
 
   # Test driver: runs the assertions, exits 0 on PASS.
   e2e:

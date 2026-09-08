@@ -1,18 +1,29 @@
 // Package secure establishes an end-to-end encrypted, mutually authenticated
-// channel over a transport.MsgConn using the Noise Protocol (XX pattern).
+// channel over a transport.MsgConn using the Noise Protocol (IK pattern).
 //
 // The hub only relays these messages; it never holds the keys, so it cannot read
-// the session — that end-to-end property is stk's whole point. XX gives mutual
-// static-key authentication: after the handshake each side learns the other's
-// static public key, which is checked against an allow-list.
+// the session — that end-to-end property is stk's whole point.
+//
+// IK is chosen deliberately for a broker with anonymous rendezvous:
+//   - The initiator (client) must already know the responder's (agent's) static
+//     key, so it authenticates the agent up front — no trust in the hub, and no
+//     MITM. That key is a required input, not an after-the-fact check.
+//   - The initiator's static key is sent in the FIRST message, so the responder
+//     authenticates the client immediately and drops an unauthorized client
+//     before completing the handshake or spawning a shell (XX only learned it on
+//     the third message, after the session was half-established).
 package secure
 
 import (
+	"bufio"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/flynn/noise"
 
@@ -60,17 +71,99 @@ func EncodePublic(pub []byte) string { return base64.StdEncoding.EncodeToString(
 // DecodePublic parses a base64 public key.
 func DecodePublic(s string) ([]byte, error) { return base64.StdEncoding.DecodeString(s) }
 
+// LoadOrCreateIdentity returns the persistent device identity stored at path,
+// creating (and persisting, mode 0600) a fresh keypair on first use. The file is
+// two base64 lines: private key, then public key. This gives each device a stable
+// long-lived identity instead of a per-process ephemeral key.
+func LoadOrCreateIdentity(path string) (Keypair, error) {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		fields := strings.Fields(string(data))
+		if len(fields) < 2 {
+			return Keypair{}, fmt.Errorf("secure: identity file %s is malformed", path)
+		}
+		priv, perr := base64.StdEncoding.DecodeString(fields[0])
+		pub, uerr := base64.StdEncoding.DecodeString(fields[1])
+		if perr != nil || uerr != nil {
+			return Keypair{}, fmt.Errorf("secure: identity file %s has invalid base64", path)
+		}
+		return Keypair{Public: pub, Private: priv}, nil
+	}
+	if !os.IsNotExist(err) {
+		return Keypair{}, err
+	}
+	kp, err := GenerateKeypair()
+	if err != nil {
+		return Keypair{}, err
+	}
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return Keypair{}, err
+		}
+	}
+	contents := EncodePublic(kp.Private) + "\n" + EncodePublic(kp.Public) + "\n"
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		return Keypair{}, err
+	}
+	return kp, nil
+}
+
+// ResolveIdentity picks a static key: a persistent identity file if identityPath
+// is set (created on first use), else an explicit base64 -key/-pubkey pair, else a
+// fresh ephemeral key. Shared by the agent and client.
+func ResolveIdentity(identityPath, privB64, pubB64 string) (Keypair, error) {
+	if identityPath != "" {
+		return LoadOrCreateIdentity(identityPath)
+	}
+	return LoadKeypair(privB64, pubB64)
+}
+
+// LoadAuthorizedKeys parses an authorized-clients file: one base64 public key per
+// line, "#" comments and blank lines ignored, any trailing text after the key
+// (a label) ignored — the SSH authorized_keys convention. Re-read per session so
+// enrolling a new client takes effect without restarting the agent.
+func LoadAuthorizedKeys(path string) ([][]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var keys [][]byte
+	sc := bufio.NewScanner(f)
+	for line := 0; sc.Scan(); line++ {
+		text := strings.TrimSpace(sc.Text())
+		if text == "" || strings.HasPrefix(text, "#") {
+			continue
+		}
+		k, derr := base64.StdEncoding.DecodeString(strings.Fields(text)[0])
+		if derr != nil {
+			return nil, fmt.Errorf("secure: %s line %d: invalid key: %w", path, line+1, derr)
+		}
+		keys = append(keys, k)
+	}
+	return keys, sc.Err()
+}
+
 // Config configures a handshake.
 type Config struct {
 	Static    Keypair
 	Initiator bool
+	// PeerStatic is the responder's static public key. REQUIRED for the initiator
+	// (IK pins the responder up front); ignored for the responder.
+	PeerStatic []byte
 	// Authorized, if non-empty, is the set of peer static public keys allowed to
-	// complete the handshake. Empty means "accept any" (demo/dev only).
+	// complete the handshake (checked by the responder against the initiator's
+	// key). Empty means "accept any authenticated peer" (demo/dev only).
 	Authorized [][]byte
 }
 
 // ErrUnauthorized is returned when the peer's static key is not in Authorized.
 var ErrUnauthorized = errors.New("secure: peer key not authorized")
+
+// ErrNoPeerStatic is returned when an initiator handshake is attempted without
+// pinning the responder's static key (required by IK).
+var ErrNoPeerStatic = errors.New("secure: initiator must pin the responder's static key (PeerStatic)")
 
 // Session is an established encrypted channel over a MsgConn.
 type Session struct {
@@ -81,59 +174,74 @@ type Session struct {
 	PeerStatic []byte
 }
 
-// Handshake performs a Noise XX handshake over conn and returns an encrypted
-// Session, rejecting the peer if its static key is not authorized.
+// Handshake performs a Noise IK handshake over conn and returns an encrypted
+// Session. The initiator pins the responder via cfg.PeerStatic; the responder
+// authenticates the initiator against cfg.Authorized on the first message and
+// drops an unauthorized peer before completing the handshake.
 func Handshake(conn transport.MsgConn, cfg Config) (*Session, error) {
+	if cfg.Initiator && len(cfg.PeerStatic) == 0 {
+		return nil, ErrNoPeerStatic
+	}
 	hs, err := noise.NewHandshakeState(noise.Config{
 		CipherSuite:   cipherSuite,
 		Random:        rand.Reader,
-		Pattern:       noise.HandshakeXX,
+		Pattern:       noise.HandshakeIK,
 		Initiator:     cfg.Initiator,
 		StaticKeypair: noise.DHKey{Public: cfg.Static.Public, Private: cfg.Static.Private},
+		PeerStatic:    cfg.PeerStatic, // used by the initiator; empty for the responder
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// XX is a 3-message handshake:
-	//   1. initiator -> responder:  e
-	//   2. responder -> initiator:  e, ee, s, es
-	//   3. initiator -> responder:  s, se
-	// The initiator writes messages 1 and 3; the responder writes message 2.
-	// The (send, recv) CipherState pair is returned on the final message.
+	// IK is a 2-message handshake:
+	//   1. initiator -> responder:  e, es, s, ss   (carries the initiator's static)
+	//   2. responder -> initiator:  e, ee, se
+	// The (send, recv) CipherState pair is returned on the second message.
 	var c0, c1 *noise.CipherState
-	for step := 1; step <= 3; step++ {
-		iWrite := (step%2 == 1) == cfg.Initiator
-		if iWrite {
-			var out []byte
-			out, c0, c1, err = hs.WriteMessage(nil, nil)
-			if err != nil {
-				return nil, err
-			}
-			if err = conn.WriteMsg(out); err != nil {
-				return nil, err
-			}
-		} else {
-			msg, rerr := conn.ReadMsg()
-			if rerr != nil {
-				return nil, rerr
-			}
-			if _, c0, c1, err = hs.ReadMessage(nil, msg); err != nil {
-				return nil, err
-			}
+	if cfg.Initiator {
+		out, _, _, werr := hs.WriteMessage(nil, nil) // msg1
+		if werr != nil {
+			return nil, werr
 		}
+		if err = conn.WriteMsg(out); err != nil {
+			return nil, err
+		}
+		msg2, rerr := conn.ReadMsg()
+		if rerr != nil {
+			return nil, rerr
+		}
+		if _, c0, c1, err = hs.ReadMessage(nil, msg2); err != nil { // completes
+			return nil, err
+		}
+	} else {
+		msg1, rerr := conn.ReadMsg()
+		if rerr != nil {
+			return nil, rerr
+		}
+		if _, _, _, err = hs.ReadMessage(nil, msg1); err != nil {
+			return nil, err
+		}
+		// Authenticate the initiator NOW, before completing the handshake.
+		peer := hs.PeerStatic()
+		if !authorized(peer, cfg.Authorized) {
+			conn.Close()
+			return nil, fmt.Errorf("%w: %s", ErrUnauthorized, EncodePublic(peer))
+		}
+		out, cc0, cc1, werr := hs.WriteMessage(nil, nil) // msg2, completes
+		if werr != nil {
+			return nil, werr
+		}
+		if err = conn.WriteMsg(out); err != nil {
+			return nil, err
+		}
+		c0, c1 = cc0, cc1
 	}
 	if c0 == nil || c1 == nil {
 		return nil, errors.New("secure: handshake did not complete")
 	}
 
-	peer := hs.PeerStatic()
-	if !authorized(peer, cfg.Authorized) {
-		conn.Close()
-		return nil, fmt.Errorf("%w: %s", ErrUnauthorized, EncodePublic(peer))
-	}
-
-	s := &Session{conn: conn, PeerStatic: peer}
+	s := &Session{conn: conn, PeerStatic: hs.PeerStatic()}
 	// c0 encrypts initiator->responder, c1 encrypts responder->initiator.
 	if cfg.Initiator {
 		s.send, s.recv = c0, c1

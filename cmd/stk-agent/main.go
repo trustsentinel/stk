@@ -20,32 +20,53 @@ func main() {
 	hub := flag.String("hub", "ws://localhost:8443/ws", "hub websocket URL")
 	room := flag.String("room", "default", "rendezvous room")
 	shellPath := flag.String("shell", "/bin/sh", "shell to spawn")
-	priv := flag.String("key", "", "base64 static private key (generated if empty)")
+	identity := flag.String("identity", "", "path to a persistent device identity (created on first use)")
+	priv := flag.String("key", "", "base64 static private key (with -pubkey; overridden by -identity)")
 	pub := flag.String("pubkey", "", "base64 static public key (with -key)")
-	authClient := flag.String("authorized-client", "", "base64 client public key allowed to connect (empty = any)")
+	authClient := flag.String("authorized-client", "", "base64 client public key allowed to connect")
+	authClients := flag.String("authorized-clients", "", "path to an authorized-clients file (base64 keys, one per line; re-read each session)")
 	once := flag.Bool("once", false, "serve a single session then exit")
 	flag.Parse()
 
-	kp, err := secure.LoadKeypair(*priv, *pub)
+	kp, err := secure.ResolveIdentity(*identity, *priv, *pub)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("stk-agent static pubkey: %s", secure.EncodePublic(kp.Public))
 
-	var allowed [][]byte
+	var staticAllowed [][]byte
 	if *authClient != "" {
 		pk, err := secure.DecodePublic(*authClient)
 		if err != nil {
 			log.Fatalf("bad -authorized-client: %v", err)
 		}
-		allowed = append(allowed, pk)
+		staticAllowed = append(staticAllowed, pk)
+	}
+	switch {
+	case *authClients != "":
+		log.Printf("authorizing clients from %s (re-read each session)", *authClients)
+	case len(staticAllowed) > 0:
 		log.Printf("authorizing only client %s", *authClient)
-	} else {
-		log.Print("WARNING: no -authorized-client set; accepting any authenticated client (demo only)")
+	default:
+		log.Print("WARNING: no -authorized-client(s) set; accepting any authenticated client (demo only)")
+	}
+
+	// allowlist is rebuilt per session so newly enrolled keys take effect without
+	// restarting the agent.
+	allowlist := func() [][]byte {
+		allowed := append([][]byte(nil), staticAllowed...)
+		if *authClients != "" {
+			fileKeys, ferr := secure.LoadAuthorizedKeys(*authClients)
+			if ferr != nil {
+				log.Printf("WARNING: reading %s: %v", *authClients, ferr)
+			}
+			allowed = append(allowed, fileKeys...)
+		}
+		return allowed
 	}
 
 	for {
-		if err := serve(*hub, *room, kp, allowed, *shellPath); err != nil {
+		if err := serve(*hub, *room, kp, allowlist, *shellPath); err != nil {
 			log.Printf("session ended: %v", err)
 		}
 		if *once {
@@ -55,7 +76,7 @@ func main() {
 	}
 }
 
-func serve(hub, room string, kp secure.Keypair, allowed [][]byte, shellPath string) error {
+func serve(hub, room string, kp secure.Keypair, allowlist func() [][]byte, shellPath string) error {
 	u := hub + "?role=agent&room=" + url.QueryEscape(room)
 	c, _, err := websocket.DefaultDialer.Dial(u, nil)
 	if err != nil {
@@ -64,7 +85,7 @@ func serve(hub, room string, kp secure.Keypair, allowed [][]byte, shellPath stri
 	conn := transport.NewWSConn(c)
 	log.Printf("connected to hub, waiting to be paired (room=%s)", room)
 
-	sess, err := secure.Handshake(conn, secure.Config{Static: kp, Initiator: false, Authorized: allowed})
+	sess, err := secure.Handshake(conn, secure.Config{Static: kp, Initiator: false, Authorized: allowlist()})
 	if err != nil {
 		conn.Close()
 		return err

@@ -46,6 +46,18 @@ func stkConnect(this js.Value, args []js.Value) any {
 	var sess *secure.Session
 
 	go func() {
+		if agentPub == "" {
+			status("error: agent key required")
+			closed()
+			return
+		}
+		pin, derr := secure.DecodePublic(agentPub)
+		if derr != nil {
+			status("error: bad agent key")
+			closed()
+			return
+		}
+
 		status("connecting")
 		enc := js.Global().Call("encodeURIComponent", room).String()
 		conn, err := transport.DialWS(hubURL + "?role=client&room=" + enc)
@@ -62,15 +74,9 @@ func stkConnect(this js.Value, args []js.Value) any {
 			closed()
 			return
 		}
-		var allowed [][]byte
-		if agentPub != "" {
-			if pk, derr := secure.DecodePublic(agentPub); derr == nil {
-				allowed = append(allowed, pk)
-			}
-		}
 
 		status("handshaking")
-		sess, err = secure.Handshake(conn, secure.Config{Static: kp, Initiator: true, Authorized: allowed})
+		sess, err = secure.Handshake(conn, secure.Config{Static: kp, Initiator: true, PeerStatic: pin})
 		if err != nil {
 			status("auth failed: " + err.Error())
 			conn.Close()

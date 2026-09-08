@@ -34,7 +34,7 @@ func TestHandshakeMutualAuthAndExchange(t *testing.T) {
 	agent, _ := secure.GenerateKeypair()
 
 	cs, cerr, ss, serr := handshakePair(t,
-		secure.Config{Static: client, Initiator: true, Authorized: [][]byte{agent.Public}},
+		secure.Config{Static: client, Initiator: true, PeerStatic: agent.Public},
 		secure.Config{Static: agent, Initiator: false, Authorized: [][]byte{client.Public}},
 	)
 	if cerr != nil {
@@ -74,9 +74,9 @@ func TestUnauthorizedClientRejectedByAgent(t *testing.T) {
 	stranger, _ := secure.GenerateKeypair()
 
 	// The agent (responder) only authorizes `stranger`, so the real client's key
-	// must be rejected — this is the gate that stops unauthorized shell access.
+	// must be rejected — on the first message, before any session or shell exists.
 	_, _, _, serr := handshakePair(t,
-		secure.Config{Static: client, Initiator: true, Authorized: [][]byte{agent.Public}},
+		secure.Config{Static: client, Initiator: true, PeerStatic: agent.Public},
 		secure.Config{Static: agent, Initiator: false, Authorized: [][]byte{stranger.Public}},
 	)
 	if serr == nil {
@@ -92,10 +92,19 @@ func TestEmptyAllowlistAcceptsAnyAuthenticatedPeer(t *testing.T) {
 	agent, _ := secure.GenerateKeypair()
 
 	_, cerr, _, serr := handshakePair(t,
-		secure.Config{Static: client, Initiator: true}, // no Authorized set
+		secure.Config{Static: client, Initiator: true, PeerStatic: agent.Public},
 		secure.Config{Static: agent, Initiator: false}, // no Authorized set
 	)
 	if cerr != nil || serr != nil {
 		t.Fatalf("empty allow-list should accept: client=%v agent=%v", cerr, serr)
+	}
+}
+
+func TestInitiatorMustPinResponder(t *testing.T) {
+	client, _ := secure.GenerateKeypair()
+	ci, _ := transport.Pipe()
+	_, err := secure.Handshake(ci, secure.Config{Static: client, Initiator: true}) // no PeerStatic
+	if !errors.Is(err, secure.ErrNoPeerStatic) {
+		t.Fatalf("want ErrNoPeerStatic, got %v", err)
 	}
 }

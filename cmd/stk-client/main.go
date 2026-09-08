@@ -20,25 +20,25 @@ import (
 func main() {
 	hub := flag.String("hub", "ws://localhost:8443/ws", "hub websocket URL")
 	room := flag.String("room", "default", "rendezvous room")
-	priv := flag.String("key", "", "base64 static private key (generated if empty)")
+	identity := flag.String("identity", "", "path to a persistent device identity (created on first use)")
+	priv := flag.String("key", "", "base64 static private key (with -pubkey; overridden by -identity)")
 	pub := flag.String("pubkey", "", "base64 static public key (with -key)")
-	authAgent := flag.String("authorized-agent", "", "base64 agent public key to require (empty = any)")
+	authAgent := flag.String("authorized-agent", "", "base64 agent public key to pin (required)")
 	execCmd := flag.String("exec", "", "run one command then exit (non-interactive)")
 	flag.Parse()
 
-	kp, err := secure.LoadKeypair(*priv, *pub)
+	kp, err := secure.ResolveIdentity(*identity, *priv, *pub)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("stk-client static pubkey: %s", secure.EncodePublic(kp.Public))
 
-	var allowed [][]byte
-	if *authAgent != "" {
-		pk, err := secure.DecodePublic(*authAgent)
-		if err != nil {
-			log.Fatalf("bad -authorized-agent: %v", err)
-		}
-		allowed = append(allowed, pk)
+	if *authAgent == "" {
+		log.Fatal("-authorized-agent (the agent's base64 public key) is required: the client pins the agent it will talk to")
+	}
+	pin, err := secure.DecodePublic(*authAgent)
+	if err != nil {
+		log.Fatalf("bad -authorized-agent: %v", err)
 	}
 
 	u := *hub + "?role=client&room=" + url.QueryEscape(*room)
@@ -48,7 +48,7 @@ func main() {
 	}
 	conn := transport.NewWSConn(c)
 
-	sess, err := secure.Handshake(conn, secure.Config{Static: kp, Initiator: true, Authorized: allowed})
+	sess, err := secure.Handshake(conn, secure.Config{Static: kp, Initiator: true, PeerStatic: pin})
 	if err != nil {
 		log.Fatalf("handshake/auth failed: %v", err)
 	}

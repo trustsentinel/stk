@@ -29,23 +29,28 @@ A runnable module now lives at the repo root (`module github.com/trustsentinel/s
   (handshake → PTY shell → command execution → multiple sessions).
 - **CI** — `.github/workflows/ci.yml`: build+test (`-race`), gofmt, wasm build,
   crypto-module tests, `govulncheck`/`gosec`, and the Compose e2e.
+- **Noise IK + early auth** — switched the handshake from XX to **IK**: the client
+  pins the agent up front (defeats a malicious hub/MITM) and the agent authenticates
+  the client on the FIRST message, dropping an unauthorized client before any
+  session or shell exists (tested).
+- **Per-device identity + enrollment** — persistent identities (`-identity`,
+  created 0600 on first use) and an SSH-`authorized_keys`-style client registry
+  (`-authorized-clients`, re-read each session, so enrolling needs no restart).
 - **`crypto/`** — the stdlib-only crypto/random helpers as a separate tested
   module. Fixes a real bug: the original `DecodeKey` copied only 4 of 32 key bytes.
 
 ## How the original blockers were resolved
 | 2019 blocker | Resolution |
 |---|---|
-| `gopkg.in/noisesocket.v0` (dead module) | rewritten as `internal/secure` on `flynn/noise` (XX) |
+| `gopkg.in/noisesocket.v0` (dead module) | rewritten as `internal/secure` on `flynn/noise` (IK) |
 | relative imports (`"./protocol"`, `"websocket"`, `"common"`) | proper module paths in the new code |
 | symlinked shared `common.go` across two `package main`s | real packages under `internal/` |
 | `externals/` experimental tree | left in `_legacy/`, excluded from the build |
 | proto2 generated code | not needed by the MVP; a proto3/connect-go schema is future work if wire-compat with the 2019 protocol is wanted |
 
 ## Not yet ported / next
-1. **Per-device identity & enrollment** — the MVP uses generated static keys; add
-   provisioning/attestation and per-user secrets.
-2. **Earlier initiator auth** — XX authenticates the client on message 3 (the agent
-   rejects an unknown client, but only as the session drops). IK/KK refuse up front.
-3. **Kubernetes manifests** — sketched in `deploy/README.md`.
-4. **Richer browser UX** (from `_legacy/auth/web`) — window resize/SIGWINCH,
+1. **Hardware attestation** — bind the device identity to a TPM/secure element so a
+   key can't be exfiltrated; add a provisioning/enrollment service.
+2. **Kubernetes manifests** — see [`deploy/k8s/`](../deploy/k8s/).
+3. **Richer browser UX** (from `_legacy/auth/web`) — window resize/SIGWINCH,
    reconnect, session list, TOTP/WebAuthn login.
