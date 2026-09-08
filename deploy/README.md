@@ -37,20 +37,16 @@ docker compose -f test/compose.yml run --rm crypto-test
 Builds the `crypto/` module and runs its unit tests (including the key-truncation
 regression test). See [`test/`](test/).
 
-## Kubernetes — the next step
+## Kubernetes
 
-Compose is the proving ground; the images it builds map cleanly onto Kubernetes
-when you need multi-node, real TLS, and network policy:
+Manifests in [`k8s/`](k8s/) run stk on a cluster — hub `Deployment`+`Service`,
+agent `Deployment` (dials out, no inbound port), identities as `Secret`s, an
+enrollment `ConfigMap`, and `NetworkPolicies`. One-command test on a throwaway
+kind cluster:
 
-- **hub** → `Deployment` + `Service`, fronted by an `Ingress` with TLS
-  (`cert-manager`) terminating the browser WebSocket — the only externally
-  reachable component.
-- **agent** → `DaemonSet` (or a sidecar) that **dials out** to the hub, so it
-  needs no inbound `Service` — the whole security point. A scoped
-  `securityContext` gates what shell it brokers.
-- **keys** → Noise static keys as `Secret`s / CSI, never baked into images.
-- **NetworkPolicy** → agent egress to the hub only; hub ingress only from the
-  ingress controller and agents.
+```bash
+deploy/k8s/kind-test.sh      # build -> load -> deploy -> run the e2e Job -> PASS
+```
 
-A `kind`/`k3d` cluster plus a small Helm chart is enough to test it. Tracked in
-the repo's `TASKS.md`.
+Details, the manual flow, and production notes (Ingress+TLS, agent as a
+`DaemonSet`): [`k8s/README.md`](k8s/README.md).

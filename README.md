@@ -61,6 +61,11 @@ make web                         # build web/stk.wasm
 ```
 Open the printed URL and press Connect. See [`web/`](web/).
 
+On **Kubernetes** (throwaway kind cluster — build, deploy, run the e2e Job):
+```bash
+deploy/k8s/kind-test.sh          # ends with: K8S RESULT: PASS
+```
+
 Without Docker: `./smoke.sh` (or `make smoke`) starts a hub, agent, and client
 locally and asserts a command round-trips through the encrypted broker.
 
@@ -71,7 +76,7 @@ locally and asserts a command round-trips through the encrypted broker.
 - `internal/shell/` — PTY-backed shell (`creack/pty`)
 - `web/` — browser client: xterm.js UI + the wasm build glue
 - `crypto/` — key handling + secure randomness, a separately-tested module
-- `deploy/` — container scenarios: `compose/` (full e2e) and `test/` (crypto tests)
+- `deploy/` — `compose/` (full e2e), `k8s/` (Kubernetes manifests + kind test), `test/` (crypto tests)
 - `_legacy/` — the original 2019 GOPATH prototype + browser front end, kept for reference (not built)
 
 ## Identity & enrollment
@@ -87,9 +92,9 @@ locally and asserts a command round-trips through the encrypted broker.
 ## Status & roadmap
 Working Go MVP (hub + agent + CLI **and** browser clients), Noise **IK** mutual auth
 (unauthorized clients refused on the first message), persistent device identities +
-an enrollment registry, unit tests, a runnable Compose e2e, and GitHub Actions CI.
-Next: Kubernetes manifests (see [`deploy/README.md`](deploy/README.md)); hardware
-attestation to bind identities to a TPM/secure element.
+an enrollment registry, unit tests, a runnable Compose e2e, **Kubernetes manifests**
+with a kind test, and GitHub Actions CI. Next: hardware attestation to bind
+identities to a TPM/secure element; richer browser UX (resize, reconnect, login).
 
 ## License
 MIT

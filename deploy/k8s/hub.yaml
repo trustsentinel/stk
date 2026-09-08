@@ -1,0 +1,46 @@
+# The broker. The only stk component that accepts inbound connections. It holds
+# no keys and only relays ciphertext, so exposing it (via the Service, or an
+# Ingress in front) does not expose the sessions.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stk-hub
+  labels: { app: stk, component: hub }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: stk, component: hub }
+  template:
+    metadata:
+      labels: { app: stk, component: hub }
+    spec:
+      containers:
+        - name: hub
+          image: stk:local
+          imagePullPolicy: IfNotPresent
+          command: ["stk-hub", "-addr", ":8443"]
+          ports:
+            - { name: ws, containerPort: 8443 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8443 }
+            initialDelaySeconds: 1
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8443 }
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stk-hub
+  labels: { app: stk, component: hub }
+spec:
+  selector: { app: stk, component: hub }
+  ports:
+    - { name: ws, port: 8443, targetPort: 8443 }

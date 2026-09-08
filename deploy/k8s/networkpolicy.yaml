@@ -1,0 +1,51 @@
+# Network policy enforcing stk's trust model. NOTE: requires a CNI that enforces
+# NetworkPolicy (Calico, Cilium, ...). The default kind CNI (kindnet) does NOT
+# enforce these, so on a plain kind cluster they are inert but still valid.
+
+# Default-deny all ingress in the namespace; specific policies below open only
+# what is needed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# The hub accepts ws/8443 only from stk pods (agents + clients). It never needs
+# to reach anything inbound-wise beyond that.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hub-ingress
+spec:
+  podSelector:
+    matchLabels: { app: stk, component: hub }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: stk }
+      ports:
+        - { protocol: TCP, port: 8443 }
+---
+# The agent only dials OUT to the hub (plus DNS). It receives nothing (the
+# default-deny above already blocks ingress to it).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-egress
+spec:
+  podSelector:
+    matchLabels: { app: stk, component: agent }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app: stk, component: hub }
+      ports:
+        - { protocol: TCP, port: 8443 }
+    - to: [] # DNS resolution
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }

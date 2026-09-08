@@ -1,0 +1,48 @@
+# On-cluster end-to-end test: an enrolled client gets a brokered shell on the
+# agent and runs a command. Job success == the flow works. Applied separately
+# from the base (kubectl apply -f test-job.yaml) after the deployment is ready.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stk-e2e
+  labels: { app: stk, component: test }
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels: { app: stk, component: test }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: client
+          image: stk:local
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              AP="$(cat /etc/stk/agent/agent.pub)"
+              i=0
+              while [ "$i" -lt 30 ]; do
+                OUT=$(stk-client -hub ws://stk-hub:8443/ws -room demo \
+                  -identity /etc/stk/identity/identity \
+                  -authorized-agent "$AP" \
+                  -exec 'echo K8S_E2E:$((6*7))' 2>/dev/null || true)
+                if echo "$OUT" | grep -q 'K8S_E2E:42'; then
+                  echo "$OUT"
+                  echo "RESULT: PASS (brokered, mutually-authenticated shell on k8s)"
+                  exit 0
+                fi
+                i=$((i + 1)); sleep 1   # agent may still be connecting to the hub
+              done
+              echo "RESULT: FAIL"; exit 1
+          volumeMounts:
+            - { name: identity, mountPath: /etc/stk/identity, readOnly: true }
+            - { name: agentpub, mountPath: /etc/stk/agent, readOnly: true }
+      volumes:
+        - name: identity
+          secret:
+            secretName: stk-client-identity
+        - name: agentpub
+          configMap:
+            name: stk-agent-pub

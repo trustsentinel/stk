@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: stk
+resources:
+  - namespace.yaml
+  - hub.yaml
+  - agent.yaml
+  - networkpolicy.yaml
+# Secrets/ConfigMaps (identities + enrollment registry) are created out-of-band by
+# gen-secrets.sh — never commit keys. The e2e Job lives in test-job.yaml.

@@ -1,0 +1,44 @@
+# The host being shelled into. It dials OUT to the hub Service, so it needs no
+# inbound port and no Service — there is nothing to connect to directly.
+#
+# Shown here as a Deployment for a testable demo. In production the agent is
+# typically a DaemonSet (one per node you want a brokered shell into) or a sidecar
+# next to a workload; the pod spec is otherwise the same.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stk-agent
+  labels: { app: stk, component: agent }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: stk, component: agent }
+  template:
+    metadata:
+      labels: { app: stk, component: agent }
+    spec:
+      containers:
+        - name: agent
+          image: stk:local
+          imagePullPolicy: IfNotPresent
+          command:
+            - stk-agent
+            - -hub=ws://stk-hub:8443/ws
+            - -room=demo
+            - -identity=/etc/stk/identity/identity
+            - -authorized-clients=/etc/stk/authorized/authorized_clients
+          volumeMounts:
+            - { name: identity, mountPath: /etc/stk/identity, readOnly: true }
+            - { name: authorized, mountPath: /etc/stk/authorized, readOnly: true }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: identity
+          secret:
+            secretName: stk-agent-identity   # created by gen-secrets.sh
+        - name: authorized
+          configMap:
+            name: stk-authorized-clients     # the enrollment registry
