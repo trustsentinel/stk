@@ -30,12 +30,15 @@ browser front end is kept under [`_legacy/`](_legacy/) for reference.
 
 ## Architecture
 
-```
-┌──────────────┐   Noise    ┌────────────┐   Noise    ┌──────────────┐
-│ client       │ ─────────> │  stk hub   │ <───────── │  agent (host)│
-│ CLI / browser│   (WS)     │  (broker)  │   (WS)     │  PTY shell   │
-└──────────────┘            └────────────┘            └──────────────┘
-   end-to-end encrypted (Noise IK, mutual auth) — hub relays ciphertext, no open shell port
+```mermaid
+flowchart LR
+  client["client<br/>(CLI or browser)"]
+  hub["stk hub<br/>broker · relays ciphertext only"]
+  agent["agent (host)<br/>PTY shell"]
+
+  client -->|WebSocket| hub
+  agent -->|"dials out, no open port"| hub
+  client -.->|"end-to-end encrypted (Noise IK, mutual auth)"| agent
 ```
 
 ## Quick start
@@ -95,6 +98,16 @@ Working Go MVP (hub + agent + CLI **and** browser clients), Noise **IK** mutual 
 an enrollment registry, unit tests, a runnable Compose e2e, **Kubernetes manifests**
 with a kind test, and GitHub Actions CI. Next: hardware attestation to bind
 identities to a TPM/secure element; richer browser UX (resize, reconnect, login).
+
+## TrustSentinel
+Part of [TrustSentinel](https://trustsentinel.eu) — secure connectivity and
+network-intelligence tooling by Álvaro López.
+
+- **[netso](https://github.com/trustsentinel/netso)** — secure-networking platform (SSI + end-to-end encryption)
+- **[stk](https://github.com/trustsentinel/stk)** — browser-based remote shell broker  ·  _this repo_
+- **[stuk](https://github.com/trustsentinel/stuk)** — SSH access gating (port-knock + MFA)
+- **[argos](https://github.com/trustsentinel/argos)** — P2P blockchain network scanning
+- **[eth-rlp](https://github.com/trustsentinel/eth-rlp)** — RLP codec for Ethereum discv4
 
 ## License
 MIT
