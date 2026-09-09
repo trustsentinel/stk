@@ -6,7 +6,7 @@
 # target end-to-end scenario in ../e2e.blueprint.yml.
 #
 # The crypto module is stdlib-only, so this build needs no network for deps.
-FROM golang:1.25-alpine
+FROM golang:1.27-alpine
 
 WORKDIR /src
 COPY crypto/ ./crypto/
