@@ -13,6 +13,6 @@ RUN set -eux; \
       CGO_ENABLED=0 go build -o "/out/$c" "./cmd/$c"; \
     done
 
-FROM alpine:3.20
+FROM alpine:3.24
 RUN apk add --no-cache curl netcat-openbsd
 COPY --from=build /out/ /usr/local/bin/
