@@ -13,8 +13,8 @@ jobs:
     name: build + test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.25"
       - name: gofmt (cmd + internal)
@@ -29,8 +29,8 @@ jobs:
     name: wasm build (browser client)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.25"
       - run: GOOS=js GOARCH=wasm go build -o /tmp/stk.wasm ./cmd/stk-wasm
@@ -39,8 +39,8 @@ jobs:
     name: crypto module tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.25"
       - run: go test ./...
@@ -50,8 +50,8 @@ jobs:
     name: govulncheck + gosec
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.25"
       - name: govulncheck
@@ -70,7 +70,7 @@ jobs:
     name: docker compose e2e
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: build images
         run: docker compose -f deploy/compose/compose.yml build
       - name: run end-to-end test
